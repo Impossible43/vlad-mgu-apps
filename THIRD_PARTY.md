@@ -13,3 +13,5 @@ Local adaptations: unique app/service/socket identities; English controls; Store
 hidden initial layer; default-off startup; bounded service restarts; installation prerequisite checks.
 
 Version 0.1.1 adds manual Dashboard selection, contain scaling for YUV video, and control-app diagnostics/settings.
+
+Version 0.1.2 replaces the colour-card heuristic with an original MIT-licensed dock-grid detector, removes unfiltered mirroring, adds persistent view presets and rejects late captures after native-screen changes.

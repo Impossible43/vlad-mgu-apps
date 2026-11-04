@@ -68,7 +68,7 @@
           ]
         },
         "40": {
-          "type": "button",
+          "type": "label",
           "name": "cmLayout",
           "properties": {
             "Visible": {
@@ -76,14 +76,14 @@
               "type": "UInt"
             },
             "Focusable": {
-              "value": 3,
+              "value": 0,
               "type": "UInt"
             }
           },
           "rows": [
             {
               "Text": {
-                "value": "Layout: Dashboard (manual)",
+                "value": "Mode: Dashboard only (automatic)",
                 "type": "Text"
               }
             }
@@ -105,7 +105,7 @@
           "rows": [
             {
               "Text": {
-                "value": "Map size: fit whole map",
+                "value": "View: Balanced",
                 "type": "Text"
               }
             }

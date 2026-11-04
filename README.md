@@ -14,7 +14,11 @@ It does not add a second CarPlay video stream and does not patch BMW's CarPlay e
 6. Open **CarPlay Map Mirror** and press **Enable map mirror**.
 7. Open CarPlay Dashboard: map on the left, widgets on the right.
 
-The default **Map size: fit whole map** preserves the entire Dashboard crop with margins instead of zooming/cropping it. The size button can select the older fill/crop behaviour. The last capture, layout result, sent-frame count and renderer connection remain visible in the control app for diagnosis.
+Version **0.1.2** is Dashboard-only: the dock's 3×3 app-grid button and map region identify Dashboard, independently of the card colour. A nonmatching frame is never sent; the mirror hides on Spotify, fullscreen maps, the app launcher, BMW menus or capture failures. Returning to Dashboard resumes automatically while enabled. Unknown layouts fail closed. No unfiltered/manual mode is available.
+
+**View** cycles **Balanced**, **More map**, **Larger details**, and saves the choice. Balanced preserves aspect ratio while filling the cluster target; More map keeps the full selected map region by scaling its width and height separately; Larger details uses a tighter crop. The crop excludes the dock, music/turn cards and ETA strip. The stock cluster's gauges and media widgets are still overlaid by BMW; this app does not hide them.
+
+Capture runs serially at up to 6 fps, with no screenshot queue. A rejected layout is checked again after a 200 ms capture cycle; disable and native-screen events hide immediately, including during in-flight capture. Screenshot time and the cluster renderer's slot arbitration add latency: zero-delay switching is not guaranteed. Diagnostics show frame count, capture-cycle time and the map slot state.
 
 The mirror starts **off after every head-unit boot**. Enable it in the app when wanted.
 Closing the control app leaves an enabled mirror running. **Disable map mirror** returns the map slot.
@@ -23,8 +27,7 @@ To remove it, remove the app and then **CarPlay Map Mirror service** in Store.
 ## Limits and verification
 
 - Upstream reports success on a G20 with firmware G_20w28.3 and CarPlay 0.20.20.
-- Version 0.1.0 was tried on an X3 G01: capture and cluster output worked, but automatic layout detection and scaling were incorrect. Version 0.1.1 corrects these paths offline; its layout still needs confirmation on that vehicle. No BMW emulator validation was performed.
-- The default is **Layout: Dashboard (manual)**. Keep Dashboard open: the manual mode crops the same map region from any visible CarPlay screen. Returning to BMW menus still hides the mirror. Automatic layout detection is optional and can reject coloured card themes or accept some fullscreen maps.
+- Version 0.1.0 was tried on an X3 G01: capture and cluster output worked, but automatic layout detection and scaling were incorrect. Version 0.1.2 corrects layout gating/cropping offline; its behaviour still needs confirmation on that vehicle. No BMW emulator validation was performed.
 - Capture assumes a 1920×720 centre surface and a high cluster map slot of 1088×480. Other display layouts may need calibration.
 - The upstream service targets about 6 fps. This is a screen mirror, not a replacement for a current native CarPlay implementation.
 - The service checks capture/native-library/renderer prerequisites during install. Missing prerequisites refuse activation.

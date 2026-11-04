@@ -184,8 +184,11 @@ class MapToggleControl extends EventEmitter {
         return this.ctl.connected();
     }
 
+    compatible() { return !!(this.status && ['balanced', 'overview', 'large'].includes(this.status.profile)); }
+
     /* ---- controls ---- */
     enable() {
+        if (!this.compatible()) return;
         this.ctl.send({ cmd: 'enable' });
     }
 
@@ -202,32 +205,30 @@ class MapToggleControl extends EventEmitter {
         }
     }
 
-    toggleLayout() {
-        this.ctl.send({cmd: this.status && this.status.layout === 'manual' ? 'layout-auto' : 'layout-manual'});
-    }
-
     toggleFit() {
-        this.ctl.send({cmd: this.status && this.status.fit === 'contain' ? 'fit-cover' : 'fit-contain'});
+        if (!this.compatible()) return;
+        const profiles = ['balanced', 'overview', 'large'];
+        const current = this.status && this.status.profile;
+        this.ctl.send({cmd: 'view-' + profiles[(profiles.indexOf(current)+1) % profiles.length]});
     }
 
-    layoutLabel() {
-        return this.status && this.status.layout === 'manual' ? 'Layout: Dashboard (manual)' : 'Layout: automatic detection';
-    }
+    layoutLabel() { return this.compatible() ? 'Mode: Dashboard only (automatic)' : 'Update mirror service to 0.1.2'; }
 
     fitLabel() {
-        return this.status && this.status.fit === 'contain' ? 'Map size: fit whole map' : 'Map size: fill area (crop)';
+        const p = this.status && this.status.profile;
+        return 'View: ' + (p === 'overview' ? 'More map' : p === 'large' ? 'Larger details' : 'Balanced');
     }
 
     diagnosticsText() {
         const d = this.status && this.status.diagnostics;
-        if (!d) return 'Diagnostics available with service 0.1.1';
+        if (!d) return 'Update mirror service to 0.1.2';
         if (d.error) return 'Last error: ' + d.error;
         return 'Last capture: ' + d.capture + '; layout: ' + d.format;
     }
 
     framesText() {
         const d = this.status && this.status.diagnostics;
-        return d ? 'Frames sent: ' + d.frames + '; renderer: ' + d.renderer : '';
+        return d ? 'Frames: ' + d.frames + '; slot: ' + (d.target || d.renderer) + '; frame: ' + (d.timing || 0) + ' ms' : '';
     }
 
     /* True while the map is enabled by the user (on or standby). The producer's
@@ -259,6 +260,7 @@ class MapToggleControl extends EventEmitter {
         if (!s) {
             return 'Connecting...';
         }
+        if (!this.compatible()) return 'Update mirror service to 0.1.2';
         switch (s.state) {
         case 'on':
             return 'Map mirror active';

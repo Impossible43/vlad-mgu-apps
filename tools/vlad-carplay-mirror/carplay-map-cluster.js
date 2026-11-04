@@ -37,7 +37,7 @@
  *   --gate-initial    front | menu (estado assumido antes do 1º evento; padrão front)
  *   --wayland DISP    WAYLAND_DISPLAY da captura (padrão wayland-0)
  *   --xdg DIR         XDG_RUNTIME_DIR da captura (padrão /run/wayland)
- *   --tmp PATH        arquivo bruto temporário (padrão /dev/shm/carplay_map_cap.rgb)
+ *   --tmp PATH        arquivo bruto temporário (padrão /dev/shm/vlad_carplay_map_cap.rgb)
  *   --cap-size WxH    tamanho da captura (padrão 1920x720)
  *   --no-contend      não disputar o slot do mapa stock
  *   --once            1 quadro e sai (debug no carro)
@@ -56,6 +56,7 @@ const fs = require('fs');
 const zlib = require('zlib');
 const { execFile } = require('child_process');
 const path = require('path');
+const dashboard = require('./dashboard.js');
 
 const SIZES = { panel: [1920, 720], map: [1088, 480], hud: [800, 480] };
 const SOMEIP_NODE = '/usr/lib/someip.node';
@@ -167,14 +168,8 @@ function processImage(img, opts) {
 }
 
 /* ---------------------------------------------------------------- detector de formato (Dashboard do CarPlay) */
-/* Dashboard = mapa COLORIDO à esquerda + coluna de cards à direita. Dois testes:
- *  1) MEIO (mapa) colorido: % de pixels saturados (|max-min|>satTh) >= tMap.
- *  2) DIREITA não é mapa: a cor na direita tem que estar CONCENTRADA, não espalhada.
- *     Divide a coluna direita numa grade cols×rows; conta células "coloridas"
- *     (sat% > cellTh). Mapa em tela cheia espalha cor por ~todas as células (12-13/16);
- *     card de música concentra a capa em 1-2 células. Exige nº de células <= tCells.
- * Medido no carro: Dash 0-2 células, tela cheia 12-13 (margem grande). Robusto a
- * música/capa, mapa sem rota e zoom. Ordem de canais (rgba/bgra) não importa p/ max-min. */
+/* Dashboard-only detection uses the dock's app-grid icon, plus map colour.
+ * Card colours and album art are not used to identify the layout. */
 function satPct(img, x0, y0, x1, y1, satTh, step) {
     const X0 = (x0 * img.width) | 0, Y0 = (y0 * img.height) | 0, X1 = (x1 * img.width) | 0, Y1 = (y1 * img.height) | 0;
     const sx = Math.max(1, ((X1 - X0) / step) | 0), sy = Math.max(1, ((Y1 - Y0) / step) | 0);
@@ -199,9 +194,8 @@ function rightCells(img, f) {
     return nc;
 }
 function detectDashboard(img, f) {
-    const satMap = satPct(img, f.mapX0, f.mapY0, f.mapX1, f.mapY1, f.satTh, f.step);
-    const cells = rightCells(img, f);
-    return { dashboard: satMap >= f.tMap && cells <= f.tCells, satMap: satMap, cells: cells, ncells: f.cols * f.rows };
+    const d = dashboard.detect(img);
+    return Object.assign(d, {satMap: d.map*100, cells: 0, ncells: 0});
 }
 /* img (rgb/rgba/bgra) -> RGBA reto (p/ salvar com encodePNG em --calibrate/debug) */
 function toRGBA(img) {
@@ -371,7 +365,7 @@ function parseArgs(argv) {
         capture: 'raw', mode: 'video', gate: true, gateInitial: 'front', wayland: 'wayland-0', xdg: '/run/wayland',
         capTool: '', screen: 'center', tmp: '', capW: 1920, capH: 720,
         startDisabled: false, control: true, ctlSock: '/dev/shm/vlad-carplay-mirror/ctl.sock', requireGuidance: false,
-        requireFormat: true, calibrate: false,
+        requireFormat: true, calibrate: false, profile: 'balanced',
         fmt: { mapX0: 0.10, mapY0: 0.12, mapX1: 0.58, mapY1: 0.88, rX0: 0.645, rY0: 0.06, rX1: 0.985, rY1: 0.95, satTh: 40, tMap: 5, tCells: 7, cellTh: 15, cols: 4, rows: 4, step: 70 },
         contend: true, once: false, infile: '', save: '', verbose: false };
     for (let i = 0; i < argv.length; i++) {
@@ -400,7 +394,8 @@ function parseArgs(argv) {
         else if (k === '--require-guidance') a.requireGuidance = true;
         else if (k === '--no-require-guidance') a.requireGuidance = false;
         else if (k === '--require-format') a.requireFormat = true;
-        else if (k === '--no-require-format') a.requireFormat = false;
+        else if (k === '--no-require-format') throw new Error('Unfiltered mirroring was removed; Dashboard detection is required');
+        else if (k === '--profile') { const v = argv[++i]; if (!['balanced', 'overview', 'large'].includes(v)) throw new Error('Unknown view profile'); a.profile = v; }
         else if (k === '--fmt-map') { const m = (argv[++i] || '').split(','); a.fmt.mapX0 = +m[0]; a.fmt.mapY0 = +m[1]; a.fmt.mapX1 = +m[2]; a.fmt.mapY1 = +m[3]; }
         else if (k === '--fmt-right') { const m = (argv[++i] || '').split(','); a.fmt.rX0 = +m[0]; a.fmt.rY0 = +m[1]; a.fmt.rX1 = +m[2]; a.fmt.rY1 = +m[3]; }
         else if (k === '--fmt-th') { const m = (argv[++i] || '').split(','); a.fmt.satTh = +m[0]; a.fmt.tMap = +m[1]; a.fmt.tCells = +m[2]; }
@@ -414,7 +409,7 @@ function parseArgs(argv) {
         else { console.error('opção desconhecida: ' + k); process.exit(2); }
     }
     if (!SIZES[a.target]) { console.error('target inválido'); process.exit(2); }
-    if (!a.tmp) a.tmp = a.capture === 'png' ? '/dev/shm/carplay_map_cap.png' : '/dev/shm/carplay_map_cap.rgb';
+    if (!a.tmp) a.tmp = a.capture === 'png' ? '/dev/shm/carplay_map_cap.png' : '/dev/shm/vlad_carplay_map_cap.rgb';
     return a;
 }
 
@@ -437,7 +432,7 @@ function main() {
     const a = parseArgs(process.argv.slice(2));
     const [outW, outH] = SIZES[a.target];
     a.interval = Math.round(1000 / a.fps);
-    a.fmtInterval = 350; /* CarPlay na frente mas formato errado: sonda ~3x/s até voltar */
+    a.fmtInterval = 200; // Keep checking Dashboard without a long off-screen delay.
     if (a.infile) { runOffline(a, outW, outH); return; }
 
     if (a.calibrate) {
@@ -452,13 +447,21 @@ function main() {
         return;
     }
 
-    const diagnostics = { capture: 'none', format: 'not checked', frames: 0, error: '', renderer: 'connecting' };
+    const viewPath = '/var/opt/vlad-carplay-mirror/view.json';
+    try {
+        const saved = JSON.parse(fs.readFileSync(viewPath, 'utf8'));
+        if (['balanced', 'overview', 'large'].includes(saved.profile)) a.profile = saved.profile;
+    } catch (e) {}
+    const diagnostics = { capture: 'none', format: 'not checked', frames: 0, error: '', renderer: 'connecting', target: 'unknown', holder: '', timing: 0, profile: a.profile };
     const { ClusterRender } = require('./cluster_render_client.js');
-    const cr = new ClusterRender('carplay_map_shot', a.socket);
+    const cr = new ClusterRender('vlad_carplay_map', a.socket);
     cr.on('ready', () => { diagnostics.renderer = 'ready'; log('cluster-render ready: backend ' + cr.backend + ', targets ' + cr.targets); });
     cr.on('disconnected', () => { diagnostics.renderer = 'disconnected'; log('desconectado do cluster-render'); });
     cr.on('layer', (ref, st, why) => log('layer ' + st + (why ? ': ' + why : '')));
-    cr.on('target', (t, st, h, why) => log('target ' + t + ' ' + st + (h && h !== 'none' ? ' (holder ' + h + ')' : '') + (why ? ': ' + why : '')));
+    cr.on('target', (t, st, h, why) => {
+        if (t === a.target) { diagnostics.target = st; diagnostics.holder = h || ''; }
+        log('target ' + t + ' ' + st + (h && h !== 'none' ? ' (holder ' + h + ')' : '') + (why ? ': ' + why : ''));
+    });
     cr.on('budget', (c, m, why) => log('budget ' + c + '/' + m + ' KB/s' + (why ? ': ' + why : '')));
     cr.on('refused', (op, ref, why) => { diagnostics.error = 'Renderer: ' + String(why || op).slice(0, 100); log('RECUSADO ' + op + (why ? ': ' + why : '')); });
 
@@ -473,7 +476,7 @@ function main() {
 
     const ctlState = { masterEnabled: !a.startDisabled };
     let hub = null;
-    const gate = a.gate ? startGate(a.gateInitial !== 'menu', log, (front, o) => { log('>> screenOwner=' + o + ' -> ' + (front ? 'MOSTRAR mapa' : 'ESCONDER (mapa stock volta)')); if (hub) hub.status(); })
+    const gate = a.gate ? startGate(a.gateInitial !== 'menu', log, (front, o) => { log('>> screenOwner=' + o + ' -> ' + (front ? 'MOSTRAR mapa' : 'ESCONDER (mapa stock volta)')); if (!front) { fmtState = false; apply(false); } if (hub) hub.status(); })
         : { front: true, ok: false };
     let fmtState = null; /* null = ainda não capturou; true = Dashboard; false = outro formato */
     function ctlStatus() {
@@ -481,16 +484,17 @@ function main() {
         const mirror = ctlState.masterEnabled && gate.front && (!a.requireGuidance || gate.guidance !== false) && fmtOk;
         return { ev: 'status', state: !ctlState.masterEnabled ? 'off' : (mirror ? 'on' : 'standby'),
             enabled: ctlState.masterEnabled, carplay: !!gate.front, guidance: gate.guidance, format: fmtState,
-            layout: a.requireFormat ? 'auto' : 'manual', fit: a.fit,
+            layout: 'auto', profile: a.profile, fit: a.profile === 'overview' ? 'fill' : 'cover',
             diagnostics: Object.assign({}, diagnostics) };
     }
     hub = a.control ? startControl(a.ctlSock, ctlStatus, (cmd) => {
         if (cmd === 'enable') ctlState.masterEnabled = true;
-        else if (cmd === 'disable') ctlState.masterEnabled = false;
-        else if (cmd === 'layout-auto') a.requireFormat = true;
-        else if (cmd === 'layout-manual') a.requireFormat = false;
-        else if (cmd === 'fit-contain') a.fit = 'contain';
-        else if (cmd === 'fit-cover') a.fit = 'cover';
+        else if (cmd === 'disable') { ctlState.masterEnabled = false; apply(false); }
+        else if (/^view-(balanced|overview|large)$/.test(cmd)) {
+            a.profile = cmd.slice(5); diagnostics.profile = a.profile;
+            try { fs.writeFileSync(viewPath + '.tmp', JSON.stringify({profile: a.profile}) + '\n'); fs.renameSync(viewPath + '.tmp', viewPath); }
+            catch (e) { log('View setting was not saved: ' + e.message); }
+        }
         log('>> controle: ' + cmd);
     }, log) : null;
 
@@ -504,37 +508,40 @@ function main() {
         if (stopped) return;
         /* base: ligado + CarPlay na frente (+ navegando, se exigido). Sem isso, nem captura. */
         const base = ctlState.masterEnabled && gate.front && (!a.requireGuidance || gate.guidance !== false);
-        if (!base) { apply(false); setTimeout(tick, 400); return; }
+        if (!base) { apply(false); setTimeout(tick, 150); return; }
         const t = Date.now();
         grab(a, (err, img) => {
             if (err) { diagnostics.error = String(err.message || err).slice(0, 120); log('captura falhou: ' + (err.message || err)); apply(false); if (a.once) return endOnce(); return setTimeout(tick, 500); }
             diagnostics.capture = img.width + 'x' + img.height;
             diagnostics.error = '';
-            /* gate de formato: só mostra no layout Dashboard (mapa à esq + cards cinza à dir) */
-            if (a.requireFormat) {
-                const d = detectDashboard(img, a.fmt);
-                diagnostics.format = d.dashboard ? 'matched' : 'rejected';
-                if (d.dashboard !== fmtState) {
-                    fmtState = d.dashboard;
-                    log('>> formato ' + (d.dashboard ? 'Dashboard' : 'outro') + ' (meio ' + d.satMap.toFixed(1) + '% / células ' + d.cells + '/' + d.ncells + ') -> ' + (d.dashboard ? 'MOSTRAR mapa' : 'ESCONDER (mapa stock volta)'));
-                    if (hub) hub.status();
-                }
-                if (!d.dashboard) { apply(false); if (a.once) return endOnce(); return setTimeout(tick, a.fmtInterval); }
-            } else { diagnostics.format = 'manual Dashboard'; }
-            apply(true);
+            // A screen-change or disable can arrive during asynchronous capture.
+            if (!ctlState.masterEnabled || !gate.front) { apply(false); return setTimeout(tick, 150); }
+            const d = detectDashboard(img, a.fmt);
+            diagnostics.format = d.dashboard ? 'Dashboard grid ' + Math.round(d.grid*100) + '%' : 'hidden: not Dashboard';
+            if (d.dashboard !== fmtState) {
+                fmtState = d.dashboard;
+                log('Dashboard: ' + d.dashboard + ' grid=' + d.grid.toFixed(2) + ' map=' + d.map.toFixed(2));
+                if (hub) hub.status();
+            }
+            if (!d.dashboard) { apply(false); if (a.once) return endOnce(); return setTimeout(tick, Math.max(0, a.fmtInterval - (Date.now()-t))); }
+            const crop = dashboard.crop(img, a.profile);
+            const fit = a.profile === 'overview' ? 'fill' : 'cover';
             try {
                 if (a.mode === 'video') {
-                    const atlas = processToYUV(img, { outW: outW, outH: outH, crop: a.crop, fit: a.fit, scale: a.scale });
+                    const atlas = processToYUV(img, { outW: outW, outH: outH, crop: crop, fit: fit, scale: a.scale });
                     cr.frame(ref, atlas, frames); frames++; diagnostics.frames = frames;
                     if (a.save && frames === 1) fs.writeFileSync(a.save, encodePNG(yuvAtlasToRGBA(atlas, outW, outH), outW, outH));
                 } else {
-                    const o = processImage(img, { outW: outW, outH: outH, crop: a.crop, fit: a.fit, scale: a.scale });
+                    const o = processImage(img, { outW: outW, outH: outH, crop: crop, fit: fit, scale: a.scale });
                     cr.pixels(ref, null, o.rgba); frames++; diagnostics.frames = frames;
                     if (a.save && frames === 1) fs.writeFileSync(a.save, encodePNG(o.rgba, outW, outH));
                 }
+                // Publish a fresh, verified map before making the layer visible.
+                apply(true);
+                diagnostics.timing = Date.now() - t;
                 if (a.verbose || frames % Math.max(1, Math.round(a.fps * 10)) === 0)
                     log('frame ' + frames + ' (' + img.width + 'x' + img.height + '->' + outW + 'x' + outH + ', ' + (Date.now() - t) + ' ms, ' + (frames / ((Date.now() - t0) / 1000)).toFixed(1) + ' fps)');
-            } catch (e) { diagnostics.error = String(e.message).slice(0, 120); log('processamento falhou: ' + e.message); }
+            } catch (e) { apply(false); diagnostics.error = String(e.message).slice(0, 120); log('processamento falhou: ' + e.message); }
             if (a.once) return endOnce();
             setTimeout(tick, Math.max(0, a.interval - (Date.now() - t)));
         });

@@ -119,7 +119,6 @@ class CarplayMapToggleApp extends OnlineApp {
             return Promise.reject(new Error(`uiDescription lacks ${missing.join(', ')}`));
         }
         this._bind(TOGGLE_NAME, () => this._control.toggle());
-        this._bind(LAYOUT_NAME, () => this._control.toggleLayout());
         this._bind(FIT_NAME, () => this._control.toggleFit());
         // Presses also arrive as the application's raw 'userEvent'; both paths
         // land in _press, which drops a press delivered twice to one.
@@ -279,9 +278,8 @@ class CarplayMapToggleApp extends OnlineApp {
         this._write(FRAMES_NAME, this._control.framesText());
         /* Never hide the button (ID7 caveat); disable it while the producer is
          * unreachable so a press cannot be lost silently. */
-        this._setEnabled(TOGGLE_NAME, this._control.connected());
-        const hasSettings = this._control.connected() && this._control.status && this._control.status.diagnostics;
-        this._setEnabled(LAYOUT_NAME, !!hasSettings);
+        this._setEnabled(TOGGLE_NAME, this._control.connected() && (this._control.isOn() || this._control.compatible()));
+        const hasSettings = this._control.connected() && this._control.compatible();
         this._setEnabled(FIT_NAME, !!hasSettings);
     }
 

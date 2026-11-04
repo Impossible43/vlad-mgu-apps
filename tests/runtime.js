@@ -13,11 +13,10 @@ async function run() {
     const subscriptions = {};
     const writes = [];
     let client, accept, captures = 0, frames = 0;
-    const shot = Buffer.alloc(32 * 32 * 4, 100);
-    for (let y = 0; y < 32; y++) for (let x = 0; x < 16; x++) {
-        const i = (y * 32 + x) * 4;
-        shot[i] = 0; shot[i + 1] = 0; shot[i + 2] = 255; shot[i + 3] = 255;
-    }
+    const make = require('./frames').make;
+    const shot = Buffer.from(make('dashboard', 'red', 'dark').data);
+    let pendingCapture = null, delayCapture = false;
+    const savedFiles = {};
     class Renderer extends EventEmitter {
         constructor() { super(); client = this; this.updates = []; }
         video(options) { this.options = options; return 1; }
@@ -34,7 +33,9 @@ async function run() {
     };
     const fakeFs = {
         readFileSync: (p) => p === '/etc/group' ? 'tm_oap_app:x:1000:\n' : shot,
-        mkdirSync() {}, unlinkSync() {}, chownSync() {}, chmodSync() {}
+        mkdirSync() {}, unlinkSync() {}, chownSync() {}, chmodSync() {},
+        writeFileSync(p, bytes) { savedFiles[p] = bytes; },
+        renameSync(from, to) { savedFiles[to] = savedFiles[from]; delete savedFiles[from]; }
     };
     const fakeNet = {
         createServer(fn) {
@@ -48,16 +49,17 @@ async function run() {
     function requireFake(id) {
         if (id === 'fs') return fakeFs;
         if (id === 'net') return fakeNet;
+        if (id === './dashboard.js') return require('../tools/vlad-carplay-mirror/dashboard');
         if (id === './cluster_render_client.js') return {ClusterRender: Renderer};
         if (id === '/usr/lib/someip.node') return {buildProxy: () => Promise.resolve(proxy)};
         if (id === 'child_process') return {execFile: (file, args, options, cb) => {
-            captures++; cb(null);
+            captures++; if (delayCapture) pendingCapture = cb; else cb(null);
         }};
         return require(id);
     }
     requireFake.main = moduleObject;
     const proc = {
-        argv: ['node', 'carplay-map-cluster.js', '--start-disabled', '--gate-initial', 'menu', '--fps', '6', '--cap-size', '32x32', '--crop', '0,0,32,32'],
+        argv: ['node', 'carplay-map-cluster.js', '--start-disabled', '--gate-initial', 'menu', '--fps', '6', '--cap-size', '960x360', '--profile', 'balanced'],
         env: {}, on() {}, exit(code) { throw new Error('unexpected exit ' + code); }
     };
     vm.runInNewContext(fs.readFileSync(path.join(__dirname, '../tools/vlad-carplay-mirror/carplay-map-cluster.js'), 'utf8'), {
@@ -79,22 +81,36 @@ async function run() {
     assert.strictEqual(captures, 1, 'explicit enable captures one frame');
     assert.strictEqual(frames, 1, 'Dashboard frame reaches the renderer');
     assert(client.updates.some((u) => u.visible === true), 'explicit enable shows map');
-    // Red Dashboard cards reproduce the user's theme: automatic detection rejects it.
-    for (let y = 0; y < 32; y++) for (let x = 16; x < 32; x++) {
-        const i = (y * 32 + x) * 4;
-        shot[i] = 0; shot[i + 1] = 0; shot[i + 2] = 255; shot[i + 3] = 255;
+    // Leaving Dashboard never sends a Spotify/fullscreen/launcher frame.
+    const sent = frames;
+    for (const kind of ['spotify', 'waze', 'launcher']) {
+        make(kind, 'red', 'dark').data.copy(shot);
+        tick();
+        assert.strictEqual(frames, sent, kind + ' is not sent to the renderer');
+        assert.strictEqual(client.updates[client.updates.length - 1].visible, false);
     }
-    tick();
-    assert.strictEqual(frames, 1, 'automatic detection rejects coloured cards');
+    // Old clients cannot re-enable the dangerous unfiltered mode.
     socket.emit('data', Buffer.from('{"cmd":"layout-manual"}\n'));
-    socket.emit('data', Buffer.from('{"cmd":"fit-contain"}\n'));
     tick();
-    assert.strictEqual(frames, 2, 'manual Dashboard sends coloured-card capture');
-    socket.emit('data', Buffer.from('{"cmd":"status"}\n'));
+    assert.strictEqual(frames, sent, 'manual bypass is refused');
+    make('dashboard', 'red', 'dark').data.copy(shot);
+    tick();
+    assert.strictEqual(frames, sent + 1, 'return to Dashboard resumes without an Enable press');
+    socket.emit('data', Buffer.from('{"cmd":"view-overview"}\n'));
     const status = writes[writes.length - 1];
-    assert.strictEqual(status.layout, 'manual');
-    assert.strictEqual(status.fit, 'contain');
-    assert.strictEqual(status.diagnostics.frames, 2);
+    assert.strictEqual(status.layout, 'auto');
+    assert.strictEqual(status.profile, 'overview');
+    assert.strictEqual(status.fit, 'fill');
+    assert.strictEqual(JSON.parse(savedFiles['/var/opt/vlad-carplay-mirror/view.json']).profile, 'overview', 'view profile saved outside version directory');
+    // Screen changes during an in-flight screenshot must not show that screenshot.
+    delayCapture = true;
+    tick();
+    const beforeRace = frames;
+    subscriptions.onScreenChange('NATIVE');
+    assert.strictEqual(client.updates[client.updates.length - 1].visible, false, 'BMW menu hides immediately');
+    pendingCapture(null);
+    assert.strictEqual(frames, beforeRace, 'late capture after native screen change is discarded');
+    delayCapture = false;
     const capturesBeforeMenu = captures;
     subscriptions.onScreenChange('NATIVE');
     tick();
@@ -126,6 +142,6 @@ async function run() {
     assert.strictEqual(letterbox[0], 0, 'top letterbox is black');
     assert.strictEqual(letterbox[4 * 4], 20, 'map begins below the letterbox');
     console.log('PASS: contain retains full map; neutral pillarbox and letterbox margins');
-    console.log('PASS: default-off, explicit enable, Dashboard output, BMW-menu handback, disable');
+    console.log('PASS: default-off, Dashboard-only transitions, automatic return, legacy bypass refused, profile persistence, capture race, disable');
 }
 run().catch((e) => { console.error(e.stack); process.exitCode = 1; });
