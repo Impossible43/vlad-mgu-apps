@@ -65,7 +65,7 @@ function detect(img) {
 // Crop only inside the left map card; discard the dock, right cards, top/bottom
 // borders and the ETA strip. Fractions are independent of raw-capture resolution.
 function crop(img, profile) {
-    const p = profile === 'large' ? [.13,.15,.59,.85] : [.092,.025,.630,.865];
+    const p = profile === 'large' ? [.13,.15,.59,.80] : [.092,.025,.630,.82];
     return {x: Math.round(img.width*p[0]), y: Math.round(img.height*p[1]),
         w: Math.round(img.width*(p[2]-p[0])), h: Math.round(img.height*(p[3]-p[1]))};
 }

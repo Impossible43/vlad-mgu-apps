@@ -184,7 +184,7 @@ class MapToggleControl extends EventEmitter {
         return this.ctl.connected();
     }
 
-    compatible() { return !!(this.status && ['balanced', 'overview', 'large'].includes(this.status.profile)); }
+    compatible() { return !!(this.status && ['cluster', 'balanced', 'overview', 'large'].includes(this.status.profile)); }
 
     /* ---- controls ---- */
     enable() {
@@ -207,7 +207,7 @@ class MapToggleControl extends EventEmitter {
 
     toggleFit() {
         if (!this.compatible()) return;
-        const profiles = ['balanced', 'overview', 'large'];
+        const profiles = ['cluster', 'balanced', 'overview', 'large'];
         const current = this.status && this.status.profile;
         this.ctl.send({cmd: 'view-' + profiles[(profiles.indexOf(current)+1) % profiles.length]});
     }
@@ -216,7 +216,7 @@ class MapToggleControl extends EventEmitter {
 
     fitLabel() {
         const p = this.status && this.status.profile;
-        return 'View: ' + (p === 'overview' ? 'More map' : p === 'large' ? 'Larger details' : 'Balanced');
+        return 'View: ' + (p === 'cluster' ? 'Fit cluster' : p === 'overview' ? 'More map' : p === 'large' ? 'Larger details' : 'Balanced');
     }
 
     diagnosticsText() {

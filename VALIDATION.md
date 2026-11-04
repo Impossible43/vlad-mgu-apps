@@ -29,3 +29,7 @@ Version 0.1.0 was exercised by the owner on an X3 G01: capture and output worked
 - Camera photographs are insufficient to prove all real CarPlay transitions. Version 0.1.2 still needs in-car confirmation; slot-arbitration delay is outside this producer's control.
 
 Run `node tests/dashboard.js`, `node tests/runtime.js`, `node tests/store.js`.
+
+## Version 0.1.3
+
+The owner confirmed More map still hides labels at the edges of the full map layer. Fit cluster therefore places the entire crop inside the upstream patch's advertised UI safe rectangle instead of filling the video layer. Offline tests check containment/aspect ratio, identical per-pixel RGBA/YUV placement and black/neutral margins, migration from the owner's legacy More map preference, and persistence of schema-2 choices. Existing Dashboard/Spotify transitions still pass. The safe rectangle is a reference geometry, not a measurement of this owner's particular cluster; real-car display confirmation remains necessary.

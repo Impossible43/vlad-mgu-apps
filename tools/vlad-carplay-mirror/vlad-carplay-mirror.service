@@ -10,7 +10,7 @@ StartLimitBurst=3
 [Service]
 User=root
 Environment=WAYLAND_DISPLAY=wayland-0 XDG_RUNTIME_DIR=/run/wayland PATH=/usr/bin:/bin
-ExecStart=/usr/bin/node /var/opt/vlad-carplay-mirror/current/carplay-map-cluster.js --fps 6 --gate-initial menu --start-disabled --require-format --profile balanced
+ExecStart=/usr/bin/node /var/opt/vlad-carplay-mirror/current/carplay-map-cluster.js --fps 6 --gate-initial menu --start-disabled --require-format --profile cluster
 Restart=on-failure
 RestartSec=10
 TimeoutStopSec=10

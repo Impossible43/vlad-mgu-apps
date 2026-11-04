@@ -32,7 +32,7 @@ async function run() {
         getValue: () => Promise.resolve(false)
     };
     const fakeFs = {
-        readFileSync: (p) => p === '/etc/group' ? 'tm_oap_app:x:1000:\n' : shot,
+        readFileSync: (p) => p === '/etc/group' ? 'tm_oap_app:x:1000:\n' : p === '/var/opt/vlad-carplay-mirror/view.json' ? JSON.stringify({profile:'overview'}) : shot,
         mkdirSync() {}, unlinkSync() {}, chownSync() {}, chmodSync() {},
         writeFileSync(p, bytes) { savedFiles[p] = bytes; },
         renameSync(from, to) { savedFiles[to] = savedFiles[from]; delete savedFiles[from]; }
@@ -59,7 +59,7 @@ async function run() {
     }
     requireFake.main = moduleObject;
     const proc = {
-        argv: ['node', 'carplay-map-cluster.js', '--start-disabled', '--gate-initial', 'menu', '--fps', '6', '--cap-size', '960x360', '--profile', 'balanced'],
+        argv: ['node', 'carplay-map-cluster.js', '--start-disabled', '--gate-initial', 'menu', '--fps', '6', '--cap-size', '960x360'],
         env: {}, on() {}, exit(code) { throw new Error('unexpected exit ' + code); }
     };
     vm.runInNewContext(fs.readFileSync(path.join(__dirname, '../tools/vlad-carplay-mirror/carplay-map-cluster.js'), 'utf8'), {
@@ -73,6 +73,7 @@ async function run() {
     accept(socket);
     assert.strictEqual(client.options.visible, false, 'map slot starts hidden');
     assert.strictEqual(writes[0].enabled, false, 'default-off is reported to the real control protocol');
+    assert.strictEqual(writes[0].profile, 'cluster', 'legacy More map setting migrates to Fit cluster');
     subscriptions.onScreenChange('PROJECTED');
     tick();
     assert.strictEqual(captures, 0, 'default-off does not capture even when CarPlay is visible');
@@ -101,6 +102,7 @@ async function run() {
     assert.strictEqual(status.layout, 'auto');
     assert.strictEqual(status.profile, 'overview');
     assert.strictEqual(status.fit, 'fill');
+    assert.strictEqual(JSON.parse(savedFiles['/var/opt/vlad-carplay-mirror/view.json']).schema, 2);
     assert.strictEqual(JSON.parse(savedFiles['/var/opt/vlad-carplay-mirror/view.json']).profile, 'overview', 'view profile saved outside version directory');
     // Screen changes during an in-flight screenshot must not show that screenshot.
     delayCapture = true;

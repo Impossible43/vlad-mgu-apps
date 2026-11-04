@@ -13,7 +13,7 @@
       ],
       "uninstallable": true,
       "requires": {
-        "vlad-carplay-mirror": "0.1.2",
+        "vlad-carplay-mirror": "0.1.3",
         "app-privacy": "0.1.0"
       }
     },

@@ -30,3 +30,20 @@ ctl.status.enabled=true;ctl.disable();assert.strictEqual(sent.pop().cmd,'disable
 ctl.status={enabled:false,layout:'auto',profile:'balanced'};
 ctl.enable();ctl.toggleFit();assert.deepStrictEqual(sent,[{cmd:'enable'},{cmd:'view-overview'}]);
 console.log('PASS: partial-update compatibility guard and view-control protocol');
+
+const p=require('../tools/vlad-carplay-mirror/carplay-map-cluster');
+const source={x:0,y:0,w:100,h:60};
+const g=p.mapGeometry(source,1088,480,'cluster');
+assert.deepStrictEqual(g.src,source,'whole map retained without source crop');
+assert(g.dest.x>=286 && g.dest.y>=72 && g.dest.x+g.dest.w<=790 && g.dest.y+g.dest.h<=440,'all map content lies inside cluster safe rectangle');
+assert(Math.abs(g.dest.w/g.dest.h-100/60)<.02,'aspect ratio retained');
+const im={width:100,height:60,channels:4,bgr:false,data:Buffer.alloc(100*60*4,255)};
+const options={outW:1088,outH:480,crop:source,fit:'cluster'};
+const image=p.processImage(im,options).rgba,video=p.processToYUV(im,options);
+for(let y=0;y<480;y++) for(let x=0;x<1088;x++) {
+ const inside=x>=g.dest.x&&x<g.dest.x+g.dest.w&&y>=g.dest.y&&y<g.dest.y+g.dest.h;
+ assert.strictEqual(image[(y*1088+x)*4],inside?255:0,'RGBA safe-area placement');
+ assert(Math.abs(video[y*1088+x]-(inside?255:0))<=1,'YUV safe-area placement');
+}
+assert.strictEqual(video[1088*480],128,'black margin has neutral chroma');
+console.log('PASS: full map fits safe rectangle in RGBA and YUV, same geometry, neutral margins');

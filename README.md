@@ -16,7 +16,9 @@ It does not add a second CarPlay video stream and does not patch BMW's CarPlay e
 
 Version **0.1.2** is Dashboard-only: the dock's 3×3 app-grid button and map region identify Dashboard, independently of the card colour. A nonmatching frame is never sent; the mirror hides on Spotify, fullscreen maps, the app launcher, BMW menus or capture failures. Returning to Dashboard resumes automatically while enabled. Unknown layouts fail closed. No unfiltered/manual mode is available.
 
-**View** cycles **Balanced**, **More map**, **Larger details**, and saves the choice. Balanced preserves aspect ratio while filling the cluster target; More map keeps the full selected map region by scaling its width and height separately; Larger details uses a tighter crop. The crop excludes the dock, music/turn cards and ETA strip. The stock cluster's gauges and media widgets are still overlaid by BMW; this app does not hide them.
+**View** now starts at **Fit cluster** (0.1.3): the entire selected map crop is contained, with its aspect ratio preserved, inside the 504×368 rectangle at (286,72) of the 1088×480 map layer. This is the UI safe rectangle advertised by the upstream CarPlay patch (`native/waze-on-cluster/patch/carplay_patch.js`, `SAFE_DEFAULT`). The rest of the map layer is black. This compact view prevents the producer itself from putting map labels behind the gauges; the exact overlap of stock widgets on this car remains to be checked.
+
+The button cycles **Fit cluster → Balanced → More map → Larger details**, and saves the choice. Balanced and Larger details fill the full layer with cropping; More map fills it with nonuniform scaling. Those older full-layer modes can be obscured by the cluster. Settings from 0.1.2 or earlier migrate to Fit cluster once; subsequent choices persist. The crop excludes the dock, right cards and ETA strip. The app does not remove BMW's gauges/media widgets or change firmware.
 
 Capture runs serially at up to 6 fps, with no screenshot queue. A rejected layout is checked again after a 200 ms capture cycle; disable and native-screen events hide immediately, including during in-flight capture. Screenshot time and the cluster renderer's slot arbitration add latency: zero-delay switching is not guaranteed. Diagnostics show frame count, capture-cycle time and the map slot state.
 
@@ -27,7 +29,7 @@ To remove it, remove the app and then **CarPlay Map Mirror service** in Store.
 ## Limits and verification
 
 - Upstream reports success on a G20 with firmware G_20w28.3 and CarPlay 0.20.20.
-- Version 0.1.0 was tried on an X3 G01: capture and cluster output worked, but automatic layout detection and scaling were incorrect. Version 0.1.2 corrects layout gating/cropping offline; its behaviour still needs confirmation on that vehicle. No BMW emulator validation was performed.
+- Version 0.1.0 was tried on an X3 G01: capture and cluster output worked, but automatic layout detection and scaling were incorrect. Version 0.1.3 adds a compact safe-area view after 0.1.2 gating/cropping; its behaviour still needs confirmation on that vehicle. No BMW emulator validation was performed.
 - Capture assumes a 1920×720 centre surface and a high cluster map slot of 1088×480. Other display layouts may need calibration.
 - The upstream service targets about 6 fps. This is a screen mirror, not a replacement for a current native CarPlay implementation.
 - The service checks capture/native-library/renderer prerequisites during install. Missing prerequisites refuse activation.

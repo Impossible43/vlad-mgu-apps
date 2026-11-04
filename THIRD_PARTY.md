@@ -15,3 +15,5 @@ hidden initial layer; default-off startup; bounded service restarts; installatio
 Version 0.1.1 adds manual Dashboard selection, contain scaling for YUV video, and control-app diagnostics/settings.
 
 Version 0.1.2 replaces the colour-card heuristic with an original MIT-licensed dock-grid detector, removes unfiltered mirroring, adds persistent view presets and rejects late captures after native-screen changes.
+
+Version 0.1.3 adds original shared map-placement geometry. The 504×368 at 286,72 UI safe rectangle is referenced from the upstream CarPlay patch; no patch code or firmware is installed by this mirror.
