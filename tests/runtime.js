@@ -13,9 +13,9 @@ async function run() {
     const subscriptions = {};
     const writes = [];
     let client, accept, captures = 0, frames = 0;
-    const shot = Buffer.alloc(4 * 4 * 4, 100);
-    for (let y = 0; y < 4; y++) for (let x = 0; x < 2; x++) {
-        const i = (y * 4 + x) * 4;
+    const shot = Buffer.alloc(32 * 32 * 4, 100);
+    for (let y = 0; y < 32; y++) for (let x = 0; x < 16; x++) {
+        const i = (y * 32 + x) * 4;
         shot[i] = 0; shot[i + 1] = 0; shot[i + 2] = 255; shot[i + 3] = 255;
     }
     class Renderer extends EventEmitter {
@@ -57,7 +57,7 @@ async function run() {
     }
     requireFake.main = moduleObject;
     const proc = {
-        argv: ['node', 'carplay-map-cluster.js', '--start-disabled', '--gate-initial', 'menu', '--fps', '6', '--cap-size', '4x4', '--crop', '0,0,4,4'],
+        argv: ['node', 'carplay-map-cluster.js', '--start-disabled', '--gate-initial', 'menu', '--fps', '6', '--cap-size', '32x32', '--crop', '0,0,32,32'],
         env: {}, on() {}, exit(code) { throw new Error('unexpected exit ' + code); }
     };
     vm.runInNewContext(fs.readFileSync(path.join(__dirname, '../tools/vlad-carplay-mirror/carplay-map-cluster.js'), 'utf8'), {
@@ -79,15 +79,53 @@ async function run() {
     assert.strictEqual(captures, 1, 'explicit enable captures one frame');
     assert.strictEqual(frames, 1, 'Dashboard frame reaches the renderer');
     assert(client.updates.some((u) => u.visible === true), 'explicit enable shows map');
+    // Red Dashboard cards reproduce the user's theme: automatic detection rejects it.
+    for (let y = 0; y < 32; y++) for (let x = 16; x < 32; x++) {
+        const i = (y * 32 + x) * 4;
+        shot[i] = 0; shot[i + 1] = 0; shot[i + 2] = 255; shot[i + 3] = 255;
+    }
+    tick();
+    assert.strictEqual(frames, 1, 'automatic detection rejects coloured cards');
+    socket.emit('data', Buffer.from('{"cmd":"layout-manual"}\n'));
+    socket.emit('data', Buffer.from('{"cmd":"fit-contain"}\n'));
+    tick();
+    assert.strictEqual(frames, 2, 'manual Dashboard sends coloured-card capture');
+    socket.emit('data', Buffer.from('{"cmd":"status"}\n'));
+    const status = writes[writes.length - 1];
+    assert.strictEqual(status.layout, 'manual');
+    assert.strictEqual(status.fit, 'contain');
+    assert.strictEqual(status.diagnostics.frames, 2);
+    const capturesBeforeMenu = captures;
     subscriptions.onScreenChange('NATIVE');
     tick();
-    assert.strictEqual(captures, 1, 'BMW menu does not capture or overwrite its map');
+    assert.strictEqual(captures, capturesBeforeMenu, 'BMW menu does not capture or overwrite its map');
     assert.strictEqual(client.updates[client.updates.length - 1].visible, false);
     socket.emit('data', Buffer.from('{"cmd":"disable"}\n'));
     subscriptions.onScreenChange('PROJECTED');
     tick();
-    assert.strictEqual(captures, 1, 'disable remains effective when CarPlay returns');
+    assert.strictEqual(captures, capturesBeforeMenu, 'disable remains effective when CarPlay returns');
     assert.strictEqual(writes[writes.length - 1].enabled, false);
+    // A tall map fitted into a wide slot retains its top and bottom, with neutral black margins.
+    const img = {width: 4, height: 8, channels: 4, bgr: false, data: Buffer.alloc(4 * 8 * 4)};
+    for (let y = 0; y < 8; y++) for (let x = 0; x < 4; x++) {
+        const i = (y * 4 + x) * 4;
+        img.data[i] = img.data[i + 1] = img.data[i + 2] = 20 + y * 25;
+        img.data[i + 3] = 255;
+    }
+    const opts = {outW: 16, outH: 8, crop: {x: 0, y: 0, w: 4, h: 8}, fit: 'contain', scale: 'nearest'};
+    const atlas = moduleObject.exports.processToYUV(img, opts);
+    assert.strictEqual(atlas.length, 16 * 8 * 1.5);
+    assert.strictEqual(atlas[6], 20, 'top of the source remains visible');
+    assert(Math.abs(atlas[7 * 16 + 6] - 195) <= 1, 'bottom of the source remains visible');
+    assert.strictEqual(atlas[0], 0, 'margin luma is black');
+    assert.strictEqual(atlas[128], 128, 'margin chroma is neutral');
+    const cover = moduleObject.exports.processToYUV(img, Object.assign({}, opts, {fit: 'cover'}));
+    assert(cover[0] > atlas[6], 'cover crops the source vertically');
+    const wide = {outW: 4, outH: 16, crop: {x: 0, y: 0, w: 4, h: 8}, fit: 'contain'};
+    const letterbox = moduleObject.exports.processToYUV(img, wide);
+    assert.strictEqual(letterbox[0], 0, 'top letterbox is black');
+    assert.strictEqual(letterbox[4 * 4], 20, 'map begins below the letterbox');
+    console.log('PASS: contain retains full map; neutral pillarbox and letterbox margins');
     console.log('PASS: default-off, explicit enable, Dashboard output, BMW-menu handback, disable');
 }
 run().catch((e) => { console.error(e.stack); process.exitCode = 1; });

@@ -202,6 +202,34 @@ class MapToggleControl extends EventEmitter {
         }
     }
 
+    toggleLayout() {
+        this.ctl.send({cmd: this.status && this.status.layout === 'manual' ? 'layout-auto' : 'layout-manual'});
+    }
+
+    toggleFit() {
+        this.ctl.send({cmd: this.status && this.status.fit === 'contain' ? 'fit-cover' : 'fit-contain'});
+    }
+
+    layoutLabel() {
+        return this.status && this.status.layout === 'manual' ? 'Layout: Dashboard (manual)' : 'Layout: automatic detection';
+    }
+
+    fitLabel() {
+        return this.status && this.status.fit === 'contain' ? 'Map size: fit whole map' : 'Map size: fill area (crop)';
+    }
+
+    diagnosticsText() {
+        const d = this.status && this.status.diagnostics;
+        if (!d) return 'Diagnostics available with service 0.1.1';
+        if (d.error) return 'Last error: ' + d.error;
+        return 'Last capture: ' + d.capture + '; layout: ' + d.format;
+    }
+
+    framesText() {
+        const d = this.status && this.status.diagnostics;
+        return d ? 'Frames sent: ' + d.frames + '; renderer: ' + d.renderer : '';
+    }
+
     /* True while the map is enabled by the user (on or standby). The producer's
      * explicit "enabled" flag wins; the state is the fallback. */
     isOn() {
@@ -235,7 +263,7 @@ class MapToggleControl extends EventEmitter {
         case 'on':
             return 'Map mirror active';
         case 'standby':
-            return 'Waiting for CarPlay Dashboard';
+            return s.carplay ? 'Waiting for Dashboard layout' : 'Open CarPlay Dashboard on centre screen';
         case 'off':
             return 'Map mirror off';
         default:

@@ -11,3 +11,5 @@
 
 Local adaptations: unique app/service/socket identities; English controls; Store manifest and dependencies;
 hidden initial layer; default-off startup; bounded service restarts; installation prerequisite checks.
+
+Version 0.1.1 adds manual Dashboard selection, contain scaling for YUV video, and control-app diagnostics/settings.

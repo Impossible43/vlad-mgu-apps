@@ -233,22 +233,38 @@ function sampleRGB(img, fx, fy, nearest, px) {
 function processToYUV(img, opts) {
     const vw = opts.outW, vh = opts.outH, nearest = opts.scale !== 'bilinear';
     const crop = clampCrop(opts.crop, img.width, img.height);
-    const src = sourceRect(crop, vw, vh, opts.fit === 'fill' ? 'fill' : 'cover');
+    let dest = { x: 0, y: 0, w: vw, h: vh };
+    let src;
+    if (opts.fit === 'contain') {
+        const scale = Math.min(vw / crop.w, vh / crop.h);
+        // Even boundaries keep black margins and 4:2:0 chroma aligned.
+        const dw = Math.max(2, Math.floor(crop.w * scale / 2) * 2);
+        const dh = Math.max(2, Math.floor(crop.h * scale / 2) * 2);
+        dest = {x: Math.floor((vw - dw) / 4) * 2, y: Math.floor((vh - dh) / 4) * 2, w: dw, h: dh};
+        src = crop;
+    } else {
+        src = sourceRect(crop, vw, vh, opts.fit === 'fill' ? 'fill' : 'cover');
+    }
     const atlas = Buffer.alloc(vw * vh + vw * (vh >> 1));
+    atlas.fill(128, vw * vh); // neutral chroma for black margins
     const px = [0, 0, 0];
-    for (let oy = 0; oy < vh; oy++) {
-        const fy = src.y + (oy + 0.5) / vh * src.h - 0.5;
-        let yi = oy * vw;
-        for (let ox = 0; ox < vw; ox++, yi++) {
-            sampleRGB(img, src.x + (ox + 0.5) / vw * src.w - 0.5, fy, nearest, px);
+    for (let oy = dest.y; oy < dest.y + dest.h; oy++) {
+        const fy = src.y + (oy - dest.y + 0.5) / dest.h * src.h - 0.5;
+        let yi = oy * vw + dest.x;
+        for (let ox = dest.x; ox < dest.x + dest.w; ox++, yi++) {
+            sampleRGB(img, src.x + (ox - dest.x + 0.5) / dest.w * src.w - 0.5, fy, nearest, px);
             atlas[yi] = clamp8(0.299 * px[0] + 0.587 * px[1] + 0.114 * px[2]);
         }
     }
     const base = vw * vh, half = vw >> 1;
     for (let cy = 0; cy < (vh >> 1); cy++) {
-        const fy = src.y + (2 * cy + 1) / vh * src.h - 0.5, row = base + cy * vw;
+        const yy = 2 * cy + 1;
+        if (yy < dest.y || yy >= dest.y + dest.h) continue;
+        const fy = src.y + (yy - dest.y) / dest.h * src.h - 0.5, row = base + cy * vw;
         for (let cx = 0; cx < half; cx++) {
-            sampleRGB(img, src.x + (2 * cx + 1) / vw * src.w - 0.5, fy, nearest, px);
+            const xx = 2 * cx + 1;
+            if (xx < dest.x || xx >= dest.x + dest.w) continue;
+            sampleRGB(img, src.x + (xx - dest.x) / dest.w * src.w - 0.5, fy, nearest, px);
             const r = px[0], g = px[1], b = px[2];
             atlas[row + cx] = clamp8(-0.168736 * r - 0.331264 * g + 0.5 * b + 128);
             atlas[row + half + cx] = clamp8(0.5 * r - 0.418688 * g - 0.081312 * b + 128);
@@ -436,18 +452,19 @@ function main() {
         return;
     }
 
+    const diagnostics = { capture: 'none', format: 'not checked', frames: 0, error: '', renderer: 'connecting' };
     const { ClusterRender } = require('./cluster_render_client.js');
     const cr = new ClusterRender('carplay_map_shot', a.socket);
-    cr.on('ready', () => log('cluster-render ready: backend ' + cr.backend + ', targets ' + cr.targets));
-    cr.on('disconnected', () => log('desconectado do cluster-render'));
+    cr.on('ready', () => { diagnostics.renderer = 'ready'; log('cluster-render ready: backend ' + cr.backend + ', targets ' + cr.targets); });
+    cr.on('disconnected', () => { diagnostics.renderer = 'disconnected'; log('desconectado do cluster-render'); });
     cr.on('layer', (ref, st, why) => log('layer ' + st + (why ? ': ' + why : '')));
     cr.on('target', (t, st, h, why) => log('target ' + t + ' ' + st + (h && h !== 'none' ? ' (holder ' + h + ')' : '') + (why ? ': ' + why : '')));
     cr.on('budget', (c, m, why) => log('budget ' + c + '/' + m + ' KB/s' + (why ? ': ' + why : '')));
-    cr.on('refused', (op, ref, why) => log('RECUSADO ' + op + (why ? ': ' + why : '')));
+    cr.on('refused', (op, ref, why) => { diagnostics.error = 'Renderer: ' + String(why || op).slice(0, 100); log('RECUSADO ' + op + (why ? ': ' + why : '')); });
 
     const ref = a.mode === 'video'
         ? cr.video({ target: a.target, x: 0, y: 0, w: outW, h: outH, vw: outW, vh: outH, fps: Math.max(1, Math.round(a.fps)), contend: a.contend, visible: false })
-        : cr.image({ target: a.target, x: 0, y: 0, w: outW, h: outH, iw: outW, ih: outH, contend: a.contend, sampling: 'bilinear' });
+        : cr.image({ target: a.target, x: 0, y: 0, w: outW, h: outH, iw: outW, ih: outH, contend: a.contend, sampling: 'bilinear', visible: false });
     if (!ref) { console.error(a.mode + ' layer recusado'); process.exit(1); }
     log('alvo ' + a.target + ' ' + outW + 'x' + outH + ' (' + a.mode + '), crop ' + [a.crop.x, a.crop.y, a.crop.w, a.crop.h].join(',') +
         ', fit ' + a.fit + '/' + a.scale + ', captura ' + a.capture + '(' + a.order + '), ' + a.fps + ' fps, gate ' + (a.gate ? 'on' : 'OFF') + (a.requireGuidance ? ' (só navegando)' : '') +
@@ -463,9 +480,19 @@ function main() {
         const fmtOk = !a.requireFormat || fmtState === true;
         const mirror = ctlState.masterEnabled && gate.front && (!a.requireGuidance || gate.guidance !== false) && fmtOk;
         return { ev: 'status', state: !ctlState.masterEnabled ? 'off' : (mirror ? 'on' : 'standby'),
-            enabled: ctlState.masterEnabled, carplay: !!gate.front, guidance: gate.guidance, format: fmtState };
+            enabled: ctlState.masterEnabled, carplay: !!gate.front, guidance: gate.guidance, format: fmtState,
+            layout: a.requireFormat ? 'auto' : 'manual', fit: a.fit,
+            diagnostics: Object.assign({}, diagnostics) };
     }
-    hub = a.control ? startControl(a.ctlSock, ctlStatus, (cmd) => { if (cmd === 'enable') ctlState.masterEnabled = true; else if (cmd === 'disable') ctlState.masterEnabled = false; log('>> controle: ' + cmd); }, log) : null;
+    hub = a.control ? startControl(a.ctlSock, ctlStatus, (cmd) => {
+        if (cmd === 'enable') ctlState.masterEnabled = true;
+        else if (cmd === 'disable') ctlState.masterEnabled = false;
+        else if (cmd === 'layout-auto') a.requireFormat = true;
+        else if (cmd === 'layout-manual') a.requireFormat = false;
+        else if (cmd === 'fit-contain') a.fit = 'contain';
+        else if (cmd === 'fit-cover') a.fit = 'cover';
+        log('>> controle: ' + cmd);
+    }, log) : null;
 
     let stopped = false, frames = 0, t0 = Date.now(), shownState = false;
     function apply(want) {
@@ -480,31 +507,34 @@ function main() {
         if (!base) { apply(false); setTimeout(tick, 400); return; }
         const t = Date.now();
         grab(a, (err, img) => {
-            if (err) { log('captura falhou: ' + (err.message || err)); apply(false); if (a.once) return endOnce(); return setTimeout(tick, 500); }
+            if (err) { diagnostics.error = String(err.message || err).slice(0, 120); log('captura falhou: ' + (err.message || err)); apply(false); if (a.once) return endOnce(); return setTimeout(tick, 500); }
+            diagnostics.capture = img.width + 'x' + img.height;
+            diagnostics.error = '';
             /* gate de formato: só mostra no layout Dashboard (mapa à esq + cards cinza à dir) */
             if (a.requireFormat) {
                 const d = detectDashboard(img, a.fmt);
+                diagnostics.format = d.dashboard ? 'matched' : 'rejected';
                 if (d.dashboard !== fmtState) {
                     fmtState = d.dashboard;
                     log('>> formato ' + (d.dashboard ? 'Dashboard' : 'outro') + ' (meio ' + d.satMap.toFixed(1) + '% / células ' + d.cells + '/' + d.ncells + ') -> ' + (d.dashboard ? 'MOSTRAR mapa' : 'ESCONDER (mapa stock volta)'));
                     if (hub) hub.status();
                 }
                 if (!d.dashboard) { apply(false); if (a.once) return endOnce(); return setTimeout(tick, a.fmtInterval); }
-            }
+            } else { diagnostics.format = 'manual Dashboard'; }
             apply(true);
             try {
                 if (a.mode === 'video') {
                     const atlas = processToYUV(img, { outW: outW, outH: outH, crop: a.crop, fit: a.fit, scale: a.scale });
-                    cr.frame(ref, atlas, frames); frames++;
+                    cr.frame(ref, atlas, frames); frames++; diagnostics.frames = frames;
                     if (a.save && frames === 1) fs.writeFileSync(a.save, encodePNG(yuvAtlasToRGBA(atlas, outW, outH), outW, outH));
                 } else {
                     const o = processImage(img, { outW: outW, outH: outH, crop: a.crop, fit: a.fit, scale: a.scale });
-                    cr.pixels(ref, null, o.rgba); frames++;
+                    cr.pixels(ref, null, o.rgba); frames++; diagnostics.frames = frames;
                     if (a.save && frames === 1) fs.writeFileSync(a.save, encodePNG(o.rgba, outW, outH));
                 }
                 if (a.verbose || frames % Math.max(1, Math.round(a.fps * 10)) === 0)
                     log('frame ' + frames + ' (' + img.width + 'x' + img.height + '->' + outW + 'x' + outH + ', ' + (Date.now() - t) + ' ms, ' + (frames / ((Date.now() - t0) / 1000)).toFixed(1) + ' fps)');
-            } catch (e) { log('processamento falhou: ' + e.message); }
+            } catch (e) { diagnostics.error = String(e.message).slice(0, 120); log('processamento falhou: ' + e.message); }
             if (a.once) return endOnce();
             setTimeout(tick, Math.max(0, a.interval - (Date.now() - t)));
         });
@@ -517,4 +547,4 @@ function main() {
 }
 
 if (require.main === module) main();
-module.exports = { decodePNG, encodePNG, readRaw, processImage, detectDashboard, satPct, parseArgs };
+module.exports = { decodePNG, encodePNG, readRaw, processImage, processToYUV, yuvAtlasToRGBA, detectDashboard, satPct, parseArgs };

@@ -1,8 +1,8 @@
 {
   "schema": 1,
   "id": "vlad_carplay_mirror",
-  "version": "0.1.0",
-  "tree": "vlad_carplay_mirror@0.1.0",
+  "version": "0.1.1",
+  "tree": "vlad_carplay_mirror@0.1.1",
   "modules": [
     "src/app.js",
     "src/control.js"
@@ -16,7 +16,7 @@
   ],
   "title": "CarPlay Map Mirror",
   "requires": {
-    "vlad-carplay-mirror": "0.1.0",
+    "vlad-carplay-mirror": "0.1.1",
     "app-privacy": "0.1.0"
   }
 }

@@ -16,4 +16,4 @@ node tests/runtime.js
 MGU_STORE_PATH=/path/to/mgu-store node tests/store.js
 ```
 
-No real-vehicle or BMW emulator validation has been performed. This is an experimental source ready for publication and subsequent compatibility checks, not a vehicle-certified release.
+Version 0.1.0 was exercised by the owner on an X3 G01: capture and output worked, while coloured Dashboard cards were rejected and fullscreen Waze was magnified. Version 0.1.1 adds manual Dashboard mode and contain scaling. Offline regression tests cover the coloured-card rejection/manual override, settings/status protocol, BMW menu handback in manual mode, and full-height map retention with neutral black margins. These changes still require confirmation in the owner’s vehicle. No BMW emulator validation was performed.

@@ -1,6 +1,6 @@
 {
   "name": "vlad_carplay_mirror",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "CarPlay Dashboard map mirror for the instrument cluster",
   "private": false,
   "main": "javascript/runner.js",

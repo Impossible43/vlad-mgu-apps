@@ -30,6 +30,10 @@ const logger = logging.getSDKLogger();
 const STATE_NAME = 'ST_OnlineApps_CarplayMapToggle';
 const STATUS_NAME = 'cmStatus';
 const TOGGLE_NAME = 'cmToggle';
+const LAYOUT_NAME = 'cmLayout';
+const FIT_NAME = 'cmFit';
+const DIAGNOSTICS_NAME = 'cmDiagnostics';
+const FRAMES_NAME = 'cmFrames';
 const PRESS_DEDUPE_MS = 400;
 
 /* RHMI event values arrive as booleans, or as 1/0 on some HMIs. */
@@ -108,13 +112,15 @@ class CarplayMapToggleApp extends OnlineApp {
         if (!this._state) {
             return Promise.reject(new Error(`uiDescription has no ${STATE_NAME}`));
         }
-        const names = [STATUS_NAME, TOGGLE_NAME];
+        const names = [STATUS_NAME, TOGGLE_NAME, LAYOUT_NAME, FIT_NAME, DIAGNOSTICS_NAME, FRAMES_NAME];
         names.forEach((name) => { this._components[name] = rhmi.getByName(name); });
         const missing = names.filter((name) => !this._components[name]);
         if (missing.length) {
             return Promise.reject(new Error(`uiDescription lacks ${missing.join(', ')}`));
         }
         this._bind(TOGGLE_NAME, () => this._control.toggle());
+        this._bind(LAYOUT_NAME, () => this._control.toggleLayout());
+        this._bind(FIT_NAME, () => this._control.toggleFit());
         // Presses also arrive as the application's raw 'userEvent'; both paths
         // land in _press, which drops a press delivered twice to one.
         rhmi.on('userEvent', (ev) => {
@@ -267,9 +273,16 @@ class CarplayMapToggleApp extends OnlineApp {
         }
         this._write(STATUS_NAME, this._control.statusText());
         this._write(TOGGLE_NAME, this._control.toggleLabel());
+        this._write(LAYOUT_NAME, this._control.layoutLabel());
+        this._write(FIT_NAME, this._control.fitLabel());
+        this._write(DIAGNOSTICS_NAME, this._control.diagnosticsText());
+        this._write(FRAMES_NAME, this._control.framesText());
         /* Never hide the button (ID7 caveat); disable it while the producer is
          * unreachable so a press cannot be lost silently. */
         this._setEnabled(TOGGLE_NAME, this._control.connected());
+        const hasSettings = this._control.connected() && this._control.status && this._control.status.diagnostics;
+        this._setEnabled(LAYOUT_NAME, !!hasSettings);
+        this._setEnabled(FIT_NAME, !!hasSettings);
     }
 
     /* ---- shutdown ---- */
