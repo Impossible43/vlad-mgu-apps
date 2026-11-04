@@ -1,0 +1,54 @@
+{
+  "id": "vlad-carplay-mirror",
+  "kind": "tool",
+  "version": "0.1.0",
+  "title": "CarPlay Map Mirror service",
+  "description": "Mirrors the CarPlay Dashboard map; no CarPlay firmware patch. Enable from its companion app.",
+  "mguHmi": [
+    "ID7"
+  ],
+  "uninstallable": true,
+  "requires": {
+    "mgu-deploy": "0.7.0",
+    "cluster-render": "0.3.7"
+  },
+  "files": [
+    {
+      "path": "carplay-map-cluster.js",
+      "from": "carplay-map-cluster.js",
+      "mode": "0644"
+    },
+    {
+      "path": "cluster_render_client.js",
+      "from": "cluster_render_client.js",
+      "mode": "0644"
+    },
+    {
+      "path": "preflight.js",
+      "from": "preflight.js",
+      "mode": "0644"
+    }
+  ],
+  "units": [
+    {
+      "name": "vlad-carplay-mirror.service",
+      "from": "vlad-carplay-mirror.service"
+    }
+  ],
+  "enable": [
+    {
+      "unit": "vlad-carplay-mirror.service",
+      "target": "multi-user.target"
+    }
+  ],
+  "recmgr": [
+    "vlad-carplay-mirror"
+  ],
+  "restart": [
+    "vlad-carplay-mirror.service"
+  ],
+  "activate": [
+    "node",
+    "preflight.js"
+  ]
+}

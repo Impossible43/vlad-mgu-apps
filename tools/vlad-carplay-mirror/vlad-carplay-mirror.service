@@ -1,0 +1,19 @@
+# SPDX-License-Identifier: MIT
+[Unit]
+Description=CarPlay Dashboard map mirror for Vlad
+RequiresMountsFor=/var/opt
+Wants=cluster-render.socket
+After=cluster-render.socket winston.service vsomeipd.service local-fs.target
+StartLimitIntervalSec=120
+StartLimitBurst=3
+
+[Service]
+User=root
+Environment=WAYLAND_DISPLAY=wayland-0 XDG_RUNTIME_DIR=/run/wayland PATH=/usr/bin:/bin
+ExecStart=/usr/bin/node /var/opt/vlad-carplay-mirror/current/carplay-map-cluster.js --fps 6 --gate-initial menu --start-disabled
+Restart=on-failure
+RestartSec=10
+TimeoutStopSec=10
+
+[Install]
+WantedBy=multi-user.target

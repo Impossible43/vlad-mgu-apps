@@ -1,0 +1,30 @@
+{
+  "schema": 1,
+  "components": [
+    {
+      "id": "vlad_carplay_mirror",
+      "kind": "app",
+      "path": "apps/vlad_carplay_mirror",
+      "build": "unit",
+      "title": "CarPlay Map Mirror",
+      "description": "Waze / Apple Maps / Google Maps from CarPlay Dashboard to the cluster. Experimental on X3.",
+      "mguHmi": [
+        "ID7"
+      ],
+      "uninstallable": true,
+      "requires": {
+        "vlad-carplay-mirror": "0.1.0",
+        "app-privacy": "0.1.0"
+      }
+    },
+    {
+      "id": "vlad-carplay-mirror",
+      "kind": "tool",
+      "path": "tools/vlad-carplay-mirror",
+      "optional": true,
+      "mguHmi": [
+        "ID7"
+      ]
+    }
+  ]
+}

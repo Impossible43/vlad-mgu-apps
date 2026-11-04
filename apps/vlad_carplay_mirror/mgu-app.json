@@ -1,0 +1,22 @@
+{
+  "schema": 1,
+  "id": "vlad_carplay_mirror",
+  "version": "0.1.0",
+  "tree": "vlad_carplay_mirror@0.1.0",
+  "modules": [
+    "src/app.js",
+    "src/control.js"
+  ],
+  "sdk": [
+    "oap-sdk/src/core/OnlineApp.js",
+    "oap-sdk/src/logging/logging"
+  ],
+  "mguHmi": [
+    "ID7"
+  ],
+  "title": "CarPlay Map Mirror",
+  "requires": {
+    "vlad-carplay-mirror": "0.1.0",
+    "app-privacy": "0.1.0"
+  }
+}

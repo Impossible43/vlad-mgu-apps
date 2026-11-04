@@ -1,0 +1,53 @@
+{
+  "schemaVersion": "1.3.0",
+  "application": {
+    "uuid": "38176ad7-7b24-545f-99ca-12d4cb094c51",
+    "type": "OnlineApp",
+    "name": "vlad_carplay_mirror",
+    "vendor": "Vlad / Isaak",
+    "version": "0.1.0",
+    "defaultLanguage": "en_GB",
+    "uiDescriptions": [
+      {
+        "applicationFilePath": "./uiDescriptions/ID7/application.xml",
+        "uiDescriptionFilePath": "./uiDescriptions/ID7/uiDescription.json",
+        "hmi": [
+          "ID7"
+        ]
+      }
+    ],
+    "stringBundleUuid": "7e984e11-d181-543f-b73b-672d2cfdd5b4",
+    "resourceBundleUuid": "9b497e4a-d15e-5bfd-8160-8faa8102b37d",
+    "variantGroups": [
+      {
+        "stringsPath": "./variantGroups/Common/texts",
+        "resourcesPath": "./variantGroups/Common/images",
+        "hmi": [
+          "ID7"
+        ],
+        "brands": [
+          "BMW"
+        ]
+      }
+    ],
+    "entryPoints": [
+      {
+        "name": "vlad_carplay_mirror",
+        "uuid": "dcb4bea9-4f9f-5ff4-961c-171b1814ac44",
+        "textId": "SID_CMT_TITLE",
+        "icon": "vlad_carplay_mirror_icon.png",
+        "insertionStateId": 20974,
+        "insertionFocusId": 2,
+        "insertionMode": "INSERT_BELOW",
+        "insertionOrder": 0,
+        "insertionPriority": 0,
+        "previewType": "NONE",
+        "bookmarkable": true,
+        "private": null,
+        "appearance": "DEFAULT",
+        "isGroupHeader": false,
+        "insertionGroup": 0
+      }
+    ]
+  }
+}

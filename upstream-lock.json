@@ -1,0 +1,10 @@
+{
+  "mirror": {
+    "repository": "isaakbruno2/carplay-map-cluster",
+    "commit": "2ab4318d6fcc981ffc647597ae91c7d6405de4ec"
+  },
+  "cluster-client": {
+    "repository": "robertnisipeanu/idrive-apps",
+    "commit": "96a306dbcda5effe1089e26e890c0382b891c061"
+  }
+}
